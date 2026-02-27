@@ -80,13 +80,22 @@ There are a total of 27 questions embedded throughout this module, many of which
 **Q.1 (Shiny)** What is meant by the term 'uncertainty' in the context of ecological forecasting?
 
 **Answer Q.1**
-
-
+“Forecast uncertainty is the range of possible alternate future conditions
+predicted by a model. We generate multiple different predictions of the future
+because the future is inherently unknown. Uncertainty comes from natural
+variability in the environment, imperfect representation of an ecological system in a
+model, and error when measuring the system. When generating a forecast,
+uncertainty can come from the structure of the model used, the initial conditions of
+the model, the parameters of the model, and the data used to drive the model,
+among other sources.”
 
 **Q.2 (Shiny)** How do you think knowing the uncertainty in a forecast helps natural resource managers? For example, if a drinking water manager received a toxic algal bloom forecast with high vs. low uncertainty in a bloom prediction, how might that affect their decision-making?
 
 **Answer Q.2**
-
+If there is low uncertainty in a toxic algal bloom forecast, they may prepare
+for the possibility of a smaller bloom rather than loading up on supplies to address a
+more certain large toxic algal bloom forecast. They may also inform the public more
+aggressively if there is a higher certainty of a toxic algal bloom forecast.
 
 
 ## Set-up
@@ -122,12 +131,11 @@ Lake Barco is one of the lake sites in the U.S. National Ecological Observatory 
 
 **Answer Q.3**
 
-Four-letter site identifier:  
-Latitude:  
-Longitude:  
-Lake area (km2):  
-Elevation (m):  
-
+Four-letter site identifier: BARC 
+Latitude: 29.675982 
+Longitude: -82.008414 
+Lake area (km2): 0.13 km2 
+Elevation (m): 27m
 
 ### Water Temperature
 
@@ -142,9 +150,8 @@ Being able to predict how water temperature may change in the short-term (up to 
 **Q.4 (Shiny)** List two potential impacts on lakes and inland water bodies as a result of increasing water temperature.
 
 **Answer Q.4**
-
-
-
+There are important effects on water quality variables such as dissolved oxygen,
+nutrient and heavy metal concentrations, and algae concentrations.
 
 Read in and view lake data.
 
@@ -161,7 +168,8 @@ plot_lake_data(lake_df)
 **Q.5 (Shiny)** Do you think there is a strong relationship between air temperature and water temperature at this lake? 
 
 **Answer Q.5**
-
+Yes, as air temperature increases, water temperature increases,
+with air temperature being a couple degrees colder than water temperature.
 
 ## Objective 2. Read in and visualize an air temperature forecast for Lake Barco 
 
@@ -213,7 +221,7 @@ plot_airtemp_forecast(lake_obs, weather_forecast, forecast_start_date)
 **Q.6 (Rmd)** Why are there multiple gray lines on the plot above? What do they represent? Be as specific as you can.  
 
 **Answer Q.6**
-
+Each grey line is an ensemble member. All the grey lines together are an ensemble. They are predictions of (forecasted) air temperatures from NOAA. 
 
 ## Objective 3. Build a linear regression forecast model 
 
