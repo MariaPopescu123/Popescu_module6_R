@@ -93,6 +93,12 @@ n_members <- 31
 
 # ----- Fit model & generate forecast----
 
+#initial condition uncertainty
+#parameter uncertainty
+#driver uncertainty
+#process uncertainty
+
+
 # Generate a dataframe to fit the model to 
 targets_lm <- targets |> 
   pivot_wider(names_from = 'variable', values_from = 'observation') |> 
@@ -103,6 +109,8 @@ targets_lm <- targets |>
 forecast_df <- NULL
 
 for(i in 1:length(focal_sites)) {  
+
+  i <- "BARC"
   
   curr_site <- focal_sites[i]
   
@@ -113,6 +121,8 @@ for(i in 1:length(focal_sites)) {
     filter(site_id == curr_site)
   
   weather_ensemble_names <- unique(noaa_future_site$parameter)
+  
+  
   
   #Fit linear model based on past data: water temperature = m * air temperature + b
   #you will need to change the variable on the left side of the ~ if you are forecasting oxygen or chla

@@ -334,17 +334,21 @@ mod_predictions_watertemp(lake_df2, pred)
 **Q.7 (Rmd)** Describe the structure of the multiple linear regression model in your own words. How is water temperature being predicted?  
 
 **Answer Q.7**
-
+The multiple linear regression model uses yesterday's water temperature and today's air temperature to predict today's water temperature. Essentially an equation is being solved to determine today's water temperature and the model is finding the y intercept and determining the coefficients for yesterday's water temp and today's air temp that can be applied to to determine today's water temp. 
 
 **Q.8 (Rmd)** Examine the values of the fitted model parameters (`coeffs`). What does this tell you about the relative importance of past water temperature and current air temperature in driving current water temperature? Examine the standard errors of the parameters (`params_se`). What do the standard errors tell you about how confident we are in the fitted model parameter values?
 
 **Answer Q.8**
+The fitted model parameters (wtemp_yday and airt) have unequal coefficients (0.81 and 0.18, respectively) indicating that wtemp_yday drives current water temperature more than airt (which makes sense, because yesterday's water temp has a stronger relationship to today's water temperature in comparison to today's air temp). The parameter SE reveal the we have more confidence in wtemp_yday (0.020) and air temp (0.019) than we do in the intercept (0.446). 
 
 
 **Q.9 (Rmd)** Assess the model fit. Examine the values of `r2`, `err`, and `rmse`, as well as the plot showing the model fit and observations. What does this tell you about model performance?  
 
 **Answer Q.9** 
-
+r2 = 0.9, err = 1.342986e-15, rmse = 0.61 
+The R2 value indicates that 90% of variance in water temperature can be explained by the model. 
+Err is very low, indicating the bias isn't very large.
+RMSE is reporting that the average prediction difference from the model daily is 0.61 degrees celcius. For water temperature it is not atrociously bad, but it still shows we are not capturing what is happening perfectly. This will feed into process uncertainty later. 
 
 ## Objective 4. Generate a deterministic forecast (without uncertainty)
 
@@ -416,12 +420,12 @@ for(i in 2:8){
 ```{r}
 starting_temperature <- 15.2 #degrees C
 
-water_temperature <- rep(NA, 8)
+water_temperature <- rep(NA, 11)
 
 water_temperature[1] <- starting_temperature
 water_temperature
 
-for(i in 2:8){
+for(i in 2:11){
   water_temperature[i] = water_temperature[i-1] + 0.1 #degrees C
   print(water_temperature[i])
 }
@@ -504,13 +508,12 @@ plot_forecast(lake_obs,
 
 **Q.11 (Rmd)** Compare the water temperature forecast plot above to the plot of the NOAA GEFS air temperature forecast. Does the forecasted water temperature track the forecasted air temperature, and why might this be?  
 
-
 **Answer Q.11** 
-
+It does predict an increase followed by a decrease, but the rate at which it increases is much faster for water temp than for the NOAA forecasts. Probably because as the model is currently, the previous day's water temperature influences the forecast more than the NOAA forecast (the coefficient is much higher 0.81 vs 0.18. 
 
 ### What is wrong with deterministic forecasts?
 
-Using a **deterministic** forecast (e.g. a forecast which is one single line, with no uncertainty) is likely to wrong (even if only slightly) because it ignores the uncertainty that is inherently associated with the future.
+Using a **deterministic** forecast (e.g. a forecast which is one single line, with no uncertainty) is likely to be wrong (even if only slightly) because it ignores the uncertainty that is inherently associated with the future.
 
 There are many things that contribute to uncertainty when generating a forecast, and a forecast should represent the range of potential outcomes and the **likelihood** of such outcomes occurring.
 
@@ -587,14 +590,13 @@ plot_forecast(lake_obs,
 **Q.12 (Shiny)** How does forecast uncertainty change further into the future?
 
 **Answer Q.12**
-
+Uncertainty increases with time.
 
 
 **Q.13 (Rmd)** Compare the plot above of the probabilistic forecast with driver uncertainty to the plot of the deterministic forecast. How do the differences in these two forecasts affect your understanding of what water temperatures are likely to be during the week of the forecast?  
 
 **Answer Q.13** 
-
-
+It helps us understand that with time there is a greater range of possible outcomes for that day (and we are less certain about what the value will be).
 
 ## Objective 6. Generate a forecast with parameter uncertainty
 
@@ -728,7 +730,7 @@ plot_forecast(lake_obs,
 
 
 **Answer Q.14**
-
+More observations can help constrain param_se reducing parameter uncertainty. 
 
 
 ## Objective 7. Generate a forecast with process uncertainty
@@ -915,7 +917,7 @@ plot_forecast(lake_obs,
 
 
 **Answer Q.15**
-
+sensor precision/accuracy and not capturing full breadth of time in a system can increase initial conditions uncertainty. 
 
 
 # Activity C:
@@ -999,21 +1001,20 @@ plot_partitioned_uc(variance_df)
 **Q.16 (Shiny)** Which source of uncertainty contributes the most to total forecast uncertainty? 
 
 **Answer Q.16**
-
-
+Parameter uncertainty contributes the most to total forecast uncertainty. 
 
 
 **Q.17 (Rmd)** Imagine that you built a new forecast model using additional variables, such as solar radiation and precipitation, to help predict water temperature. Do you think this new water temperature forecast model would have the same or different quantities of uncertainty as our current model? Why? Address each type of uncertainty in your answer.
 
 **Answer Q.17**
 
-*Driver uncertainty*
+*Driver uncertainty* This would likely increase since more drivers means more uncertainty for the those drivers. 
 
-*Parameter uncertainty*
+*Parameter uncertainty* This would likely increase since additional variables, would mean additional sources of uncertainty for the parameters of each variable. 
 
-*Initial conditions uncertainty*
+*Initial conditions uncertainty* This wouldn't change, because adding solar radiation and precipitation wouldn't affect water temperature IC uncertainty. 
 
-*Process uncertainty*
+*Process uncertainty* This would possibly decrease since adding these two variables would help constrain (and explain) the model better (and overall uncertainty would likely decrease as well).
 
 
 ## Objective 11. Build and fit your own model
@@ -1074,7 +1075,7 @@ model_data <- lake_df %>%
 **Answer Q.18** Edit the code block to provide your answer
 
 ```{r}
-fit <- lm(model_data$wtemp ~ model_data$wtemp_yday + model_data$airt) #INSERT ADDITIONAL COVARIATES IN THE PARENTHESES
+fit <- lm(model_data$wtemp ~ model_data$wtemp_yday + model_data$airt + model_data$wnd) #added wnd
 fit_summary <- summary(fit)
 ```
 
@@ -1127,8 +1128,7 @@ mod_predictions_watertemp(lake_df2, pred)
 **Q.19** Describe the structure of the multiple linear regression model in your own words. How is water temperature being predicted? How does the structure of this model differ from the model fitted previously? 
   
 **Answer Q.19**
-  
-  
+The multiple linear regression model has one y-intercept and multiple coefficients to predict water temperature. Each coefficient is associated with either wtemp_yday, airt, or wnd. The difference is now wind has been added. 
   
 ## Objective 12. Generate forecasts with partitioned uncertainty
 
@@ -1182,15 +1182,16 @@ forecast_driver_unc2 <- tibble(forecast_date = rep(forecasted_dates, times = n_m
 If I built a model with air temperature and shortwave radiation as drivers, I could adjust the `#run model` code from:
 
 ```{r, eval = FALSE}
-#run model - REVISE THIS!!!!!!
-    temp_pred$value <- coeffs[1] + temp_lag$value * coeffs[2] + temp_driv$air_temperature * coeffs[3] 
+#commented these out MP 
+# #run model - REVISE THIS!!!!!!
+#     temp_pred$value <- coeffs[1] + temp_lag$value * coeffs[2] + temp_driv$air_temperature * coeffs[3] 
 ```
 
 to:
 
 ```{r, eval = FALSE}
 #run model - REVISE THIS!!!!!!
-    temp_pred$value <- coeffs[1] + temp_lag$value * coeffs[2] + temp_driv$air_temperature * coeffs[3] + temp_driv$solar_radiation * coeffs[4] 
+    # temp_pred$value <- coeffs[1] + temp_lag$value * coeffs[2] + temp_driv$air_temperature * coeffs[3] + temp_driv$solar_radiation * coeffs[4] 
 ```
 
 **HINT** Make sure you multiply each coefficient by the correct driver!
@@ -1211,8 +1212,8 @@ for(d in 2:length(forecasted_dates)) {
     temp_lag <- forecast_driver_unc2 %>%
       filter(forecast_date == forecasted_dates[d-1])
     
-  #run model - REVISE THIS!!!!!!
-    temp_pred$value <- coeffs[1] + temp_lag$value * coeffs[2] + temp_driv$air_temperature * coeffs[3] 
+  #run model - REVISE THIS!!!!!! done
+    temp_pred$value <- coeffs[1] + temp_lag$value * coeffs[2] + temp_driv$air_temperature * coeffs[3] + temp_driv$wind_speed * coeffs[4]
     
   #insert values back into the forecast dataframe
     forecast_driver_unc2 <- forecast_driver_unc2 %>%
@@ -1254,7 +1255,8 @@ Now, we will generate parameter distributions based on parameter estimates for t
 ```{r}
 param.df <- data.frame(beta1 = rnorm(n_members, coeffs[1], params_se[1]),
                  beta2 = rnorm(n_members, coeffs[2], params_se[2]),
-                 beta3 = rnorm(n_members, coeffs[3], params_se[3]))
+                 beta3 = rnorm(n_members, coeffs[3], params_se[3]),
+                 beta4 = rnorm(n_members, coeffs[4], params_se[4]))
 ```
 
 Plot each of the parameter distributions you have created. 
@@ -1301,7 +1303,7 @@ for(d in 2:length(forecasted_dates)) {
       filter(forecast_date == forecasted_dates[d-1])
     
   #run the model using parameter distributions instead of fixed values - REVISE THIS!!
-    temp_pred$value <- param.df$beta1 + temp_lag$value * param.df$beta2 + temp_driv$air_temperature * param.df$beta3 
+    temp_pred$value <- param.df$beta1 + temp_lag$value * param.df$beta2 + temp_driv$air_temperature * param.df$beta3 + temp_driv$wind_speed * param.df$beta4
     
   #insert values back into the forecast dataframe
     forecast_parameter_unc2 <- forecast_parameter_unc2 %>%
@@ -1355,11 +1357,11 @@ for(d in 2:length(forecasted_dates)) {
       filter(forecast_date == forecasted_dates[d] & ensemble_member == 1)
     
   #pull lagged water temp values
-    temp_lag <- forecast_parameter_unc2 %>%
+    temp_lag <- forecast_process_unc2 %>%
       filter(forecast_date == forecasted_dates[d-1])
-    
-  #run model - REVISE THIS!!
-    temp_pred$value <- coeffs[1] + temp_lag$value * coeffs[2] + temp_driv$air_temperature * coeffs[3] + rnorm(n = n_members, mean = 0, sd = sigma)
+
+  #run model - REVISE THIS!! done
+    temp_pred$value <- coeffs[1] + temp_lag$value * coeffs[2] + temp_driv$air_temperature * coeffs[3] + temp_driv$wind_speed * coeffs[4] + rnorm(n = n_members, mean = 0, sd = sigma)
     
   #insert values back into the forecast dataframe
     forecast_process_unc2 <- forecast_process_unc2 %>%
@@ -1433,8 +1435,9 @@ for(d in 2:length(forecasted_dates)) {
     temp_lag <- forecast_ic_unc2 %>%
       filter(forecast_date == forecasted_dates[d-1])
     
-  #run model - REVISE THIS!!
-    temp_pred$value <- coeffs[1] + temp_lag$value * coeffs[2] + temp_driv$air_temperature * coeffs[3] 
+  #run model - REVISE THIS!! done
+    temp_pred$value <- coeffs[1] + temp_lag$value * coeffs[2] + temp_driv$air_temperature * coeffs[3] + temp_driv$wind_speed *coeffs[4]
+
     
   #insert values back into the forecast dataframe
     forecast_ic_unc2 <- forecast_ic_unc2 %>%
@@ -1481,24 +1484,25 @@ plot_partitioned_uc(variance_df)
 **Q.25** Which source of uncertainty contributes the most to total forecast uncertainty for your model?
 
 **Answer Q.25**
+Parameter uncertainty contributes the most to total forecast uncertainty for my model. 
 
 **Q26** Compare how total forecast uncertainty over time differed between forecasts made with your model vs. the multiple linear regression model fitted in the module6.Rmd. Be sure to address how the contribution of each of the four sources of uncertainty (process, parameter, initial conditions & driver) is different between the two models, and why this might be. 
 
 **Answer Q.26** 
-Compare the amount of total forecast uncertainty over time:    
+Compare the amount of total forecast uncertainty over time: Total forecast uncertainty increased for my model vs the multiple regression model fitted in module6.
 
-Compare the contribution of driver uncertainty:     
+Compare the contribution of driver uncertainty: Driver uncertainty looks about the same for both models. But the scale is different. It has probably increased just a little bit since there is an additional driver.         
 
-Compare the contribution of parameter uncertainty:     
+Compare the contribution of parameter uncertainty: It also increased because I added an additional driver, so that means additional parameter uncertainty associated with that driver.      
 
-Compare the contribution of process uncertainty:     
+Compare the contribution of process uncertainty: Process uncertainty decreased, probably because the additional driver helped constrain the model more.     
 
-Compare the contribution of initial conditions uncertainty:     
+Compare the contribution of initial conditions uncertainty: Initial condition uncertainty remained small, but we didn't alter anything in the model to change initial condition uncertainty!     
 
 **Q.27** You have been given $5,000 to improve your water temperature forecasts. Now that you have seen how increasing model complexity affects forecast uncertainty, what would you spend this money on to reduce your forecast uncertainty?
 
 **Answer Q.27**
-
+For this model, I would try to reduce parameter uncertainty since it is the greatest contributor of uncertainty. I can do that with more data points and observations, because my standard errors would decrease as my sample size increases. Once I am able to better constrain my parameter uncertainty I would add additional drivers like precipitation, inflow or outflow to reduce process uncertainty. 
 
 
 Congratulations! You have quantified all the uncertainty. Now, have a nap. :-)  
