@@ -108,11 +108,12 @@ targets_lm <- targets |>
 # Loop through each site to fit the model
 forecast_df <- NULL
 
-for(i in 1:length(focal_sites)) {  
-
-  i <- "BARC"
+for(i in 1:length(focal_sites)) { 
   
-  curr_site <- focal_sites[i]
+  #curr_site <- focal_sites[i] UNCOMMENT WHEN DONE TESTING
+  
+  #remove when done
+  curr_site <- "BARC"
   
   site_target <- targets_lm |>
     filter(site_id == curr_site)
@@ -123,11 +124,43 @@ for(i in 1:length(focal_sites)) {
   weather_ensemble_names <- unique(noaa_future_site$parameter)
   
   
-  
   #Fit linear model based on past data: water temperature = m * air temperature + b
   #you will need to change the variable on the left side of the ~ if you are forecasting oxygen or chla
   fit <- lm(site_target$temperature ~ site_target$air_temperature)
   # fit <- lm(site_target$temperature ~ ....)
+  
+  #parameter uncertainty
+  coeffs <- round(fit$coefficients, 2)
+  fit_summary <- summary(fit)
+  params_se <- fit_summary$coefficients[,2]
+  mod <- predict(fit, site_target) #replace model_data with site_target
+
+  #this part needed for parameter uncertainty
+  param_df <- data.frame(beta1 = rnorm(n_members, coeffs[1], params_se[1]),
+                         beta2 = rnorm(n_members, coeffs[2], params_se[2]))
+  
+  #this part needed for IC uncertainty
+  #need to update forecast_date to max datetime, because forecast date is not in the dataframe?
+  curr_wt <- site_target %>% #need to update lake_df to site_target
+    filter(datetime == max(datetime)) %>% # wtemp to temperature
+    pull(temperature)
+  
+  ic_sd <- 0.1
+  ic_uc <- rnorm(n = n_members, mean = curr_wt, sd = ic_sd)
+  
+  ic_df <- tibble(forecast_date = rep(as.Date(forecast_date), times = n_members),
+                  ensemble_member = c(1:n_members),
+                  forecast_variable = "water_temperature",
+                  value = ic_uc,
+                  uc_type = "initial_conditions")
+  
+  forecast_ic_unc <- tibble(forecast_date = rep(forecasted_dates, times = n_members),
+                            ensemble_member = rep(1:n_members, each = length(forecasted_dates)),
+                            forecast_variable = "water_temperature",
+                            value = as.double(NA),
+                            uc_type = "initial_conditions") %>%
+  rows_update(ic_df, by = c("forecast_date","ensemble_member","forecast_variable",
+                              "uc_type")) 
   
   # Loop through all forecast dates
   for (t in 1:length(forecasted_dates)) {
@@ -147,7 +180,8 @@ for(i in 1:length(focal_sites)) {
                site_id == curr_site,
                parameter == met_ens)
       
-      forecasted_temperature <- fit$coefficients[1] + fit$coefficients[2] * temp_driv$air_temperature
+      #updated for param uncertainty
+      forecasted_temperature <- param_df$beta1[ens] + param_df$beta2[ens] * temp_driv$air_temperature[ens]
       
       # put all the relevant information into a tibble that we can bind together
       curr_site_df <- tibble(datetime = forecasted_dates[t],
