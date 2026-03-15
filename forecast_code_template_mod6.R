@@ -11,7 +11,7 @@ library(lubridate)
 # Change this for your model ID
 # Include the word "example" in my_model_id for a test submission
 # Don't include the word "example" in my_model_id for a forecast that you have registered (see neon4cast.org for the registration form)
-my_model_id <- 'example_ID'
+my_model_id <- 'maria_example_ID'
 
 # --Model description--- #
 
@@ -93,10 +93,10 @@ n_members <- 31
 
 # ----- Fit model & generate forecast----
 
-#initial condition uncertainty
-#parameter uncertainty
-#driver uncertainty
-#process uncertainty
+#initial condition uncertainty (from water temp done)
+#parameter uncertainty (done)
+#driver uncertainty (from the 31 NOAA ensemble members)
+#process uncertainty (done)
 
 
 # Generate a dataframe to fit the model to 
@@ -110,13 +110,11 @@ forecast_df <- NULL
 
 for(i in 1:length(focal_sites)) { 
   
-  #curr_site <- focal_sites[i] UNCOMMENT WHEN DONE TESTING
-  
-  #remove when done
-  curr_site <- "BARC"
+  curr_site <- focal_sites[i] #UNCOMMENT WHEN DONE TESTING
   
   site_target <- targets_lm |>
-    filter(site_id == curr_site)
+    filter(site_id == curr_site) |>
+    mutate(temp_yday = lag(temperature))
   
   noaa_future_site <- weather_future_daily |> 
     filter(site_id == curr_site)
@@ -124,10 +122,9 @@ for(i in 1:length(focal_sites)) {
   weather_ensemble_names <- unique(noaa_future_site$parameter)
   
   
-  #Fit linear model based on past data: water temperature = m * air temperature + b
+  #Fit linear model based on past data: water temperature = b1 + b2 * yesterday's water temp + b3 * air temperature
   #you will need to change the variable on the left side of the ~ if you are forecasting oxygen or chla
-  fit <- lm(site_target$temperature ~ site_target$air_temperature)
-  # fit <- lm(site_target$temperature ~ ....)
+  fit <- lm(site_target$temperature ~ site_target$temp_yday + site_target$air_temperature)
   
   #parameter uncertainty
   coeffs <- round(fit$coefficients, 2)
@@ -137,8 +134,13 @@ for(i in 1:length(focal_sites)) {
 
   #this part needed for parameter uncertainty
   param_df <- data.frame(beta1 = rnorm(n_members, coeffs[1], params_se[1]),
-                         beta2 = rnorm(n_members, coeffs[2], params_se[2]))
-  
+                         beta2 = rnorm(n_members, coeffs[2], params_se[2]),
+                         beta3 = rnorm(n_members, coeffs[3], params_se[3]))
+
+  #this part needed for process uncertainty
+  residuals <- mod - site_target$temperature
+  sigma <- sd(residuals, na.rm = TRUE) # Process Uncertainty Noise Std Dev.; this is your sigma
+
   #this part needed for IC uncertainty
   #need to update forecast_date to max datetime, because forecast date is not in the dataframe?
   curr_wt <- site_target %>% #need to update lake_df to site_target
@@ -164,34 +166,48 @@ for(i in 1:length(focal_sites)) {
   
   # Loop through all forecast dates
   for (t in 1:length(forecasted_dates)) {
-    
-    # use linear regression to forecast water temperature for each ensemble member
-    # You will need to modify this line of code if you add additional weather variables or change the form of the model
-    # The model here needs to match the model used in the lm function above (or what model you used in the fit)
-    
+
     # Loop over each ensemble member
     for(ens in 1:n_members){
-      
+
       met_ens <- weather_ensemble_names[ens]
-      
+
       #pull driver ensemble for the relevant date; here we are using all 31 NOAA ensemble members
       temp_driv <- weather_future_daily %>%
         filter(datetime == forecasted_dates[t],
                site_id == curr_site,
                parameter == met_ens)
-      
-      #updated for param uncertainty
-      forecasted_temperature <- param_df$beta1[ens] + param_df$beta2[ens] * temp_driv$air_temperature[ens]
-      
+
+      # pull lagged water temp: use IC uncertainty for first date, previous forecast for subsequent dates
+      if(t == 1){
+        temp_lag <- forecast_ic_unc %>%
+          filter(forecast_date == forecasted_dates[t],
+                 ensemble_member == ens) %>%
+          pull(value)
+      } else {
+        temp_lag <- forecast_ic_unc %>%
+          filter(forecast_date == forecasted_dates[t-1],
+                 ensemble_member == ens) %>%
+          pull(value)
+      }
+
+      #updated for param + IC + process uncertainty: wt = b1 + b2 * yesterday's wt + b3 * air temp + W
+      forecasted_temperature <- param_df$beta1[ens] + param_df$beta2[ens] * temp_lag + param_df$beta3[ens] * temp_driv$air_temperature[1] + rnorm(1, mean = 0, sd = sigma)
+
+      # store forecast back into forecast_ic_unc so it can be used as lag for next timestep
+      forecast_ic_unc <- forecast_ic_unc %>%
+        mutate(value = ifelse(forecast_date == forecasted_dates[t] & ensemble_member == ens,
+                              forecasted_temperature, value))
+
       # put all the relevant information into a tibble that we can bind together
       curr_site_df <- tibble(datetime = forecasted_dates[t],
                              site_id = curr_site,
                              parameter = met_ens,
                              prediction = forecasted_temperature,
                              variable = "temperature") #Change this if you are forecasting a different variable
-      
+
       forecast_df <- dplyr::bind_rows(forecast_df, curr_site_df)
-      
+
     }
   }
   
