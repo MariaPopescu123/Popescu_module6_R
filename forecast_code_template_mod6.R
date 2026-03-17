@@ -3,6 +3,10 @@
 ## install.packages('lubridate') # working with dates and times
 ## remotes::install_github('eco4cast/neon4cast') # package from NEON4cast challenge organisers to assist with forecast building and submission
 
+#I have updated this script to indicate places where I used AI and provide my explanations showing
+#my understanding of what I did for this assignment, but
+#but also please see comment in Canvas assignment submission regarding how I used AI! 
+
 # ------ Load packages -----
 library(tidyverse)
 library(lubridate)
@@ -14,12 +18,27 @@ library(lubridate)
 my_model_id <- 'maria_example_ID'
 
 # --Model description--- #
+# This is a lagged autoregressive model using 31 ensemble members and water
+#temperature from the day prior to predict water temperature. 
 
 # Add a brief description of your modeling approach
+# This is mosty detailed within my uncertainty representation. But I use historical 
+# water temperature and NOAA weather to fit a linear model to temperature. 
+# That model is then applied to predict water temperature using future NOAA ensemble members, 
+# and water temperature based on the initial conditions I create (with IC uncertainty). Water temperature from the forecast
+# is then plugged back in to be used in the next time step. 
 
 # -- Uncertainty representation -- #
-
 # Describe what sources of uncertainty are included in your forecast and how you estimate each source.
+#1. parameter uncertainty was added from obtaining the output from the model itself and then making a distribution based on the models own uncertainty.
+#   the summary of the model provides the coefficient and se for each parameter and then we draw randomly (for however many ensemble members we have)
+#   to provide slightly different numbers based on this spread
+#2. IC uncertainty: I added temp yday so that I could also include IC uncertainty (had a lot of trouble with this one so I used AI)
+#   but I understand the it is essentially random noise produced at the beginning and now by adding temp yday it is now a lagged autoregressive model
+#3. driver uncertainty: this is already done by using 31 ensemble members from NOAA forecast 
+#4. process uncertainty: this is done by calculating the difference between the model and actual temp observations. 
+#   we then obtain the sigma from this and later add it as random noise within the loop from a random draw with 0 as the starting point and sigma as the width. 
+
 
 #------- Read data --------
 # read in the targets data
@@ -140,6 +159,9 @@ for(i in 1:length(focal_sites)) {
   #this part needed for process uncertainty
   residuals <- mod - site_target$temperature
   sigma <- sd(residuals, na.rm = TRUE) # Process Uncertainty Noise Std Dev.; this is your sigma
+  #used ai here^ to help me figure out how to introduce process uncertainty
+  #but I understand that process uncertainty is what the model essentially doesn't capture. 
+  #it's just the difference between model temperature and what the actual temperature is 
 
   #this part needed for IC uncertainty
   #need to update forecast_date to max datetime, because forecast date is not in the dataframe?
@@ -148,8 +170,10 @@ for(i in 1:length(focal_sites)) {
     pull(temperature)
   
   ic_sd <- 0.1
-  ic_uc <- rnorm(n = n_members, mean = curr_wt, sd = ic_sd)
+  ic_uc <- rnorm(n = n_members, mean = curr_wt, sd = ic_sd) #this adds random noise based around my current wt to produce IC uncertainty
   
+  #for each ensemble member there is now a diff IC value saved in this df to start it off
+  #this from module 6 rmd
   ic_df <- tibble(forecast_date = rep(as.Date(forecast_date), times = n_members),
                   ensemble_member = c(1:n_members),
                   forecast_variable = "water_temperature",
@@ -179,6 +203,7 @@ for(i in 1:length(focal_sites)) {
                parameter == met_ens)
 
       # pull lagged water temp: use IC uncertainty for first date, previous forecast for subsequent dates
+      #had difficulty in this part with the for loop and integrating ensemble members, had help w AI
       if(t == 1){
         temp_lag <- forecast_ic_unc %>%
           filter(forecast_date == forecasted_dates[t],
@@ -191,9 +216,12 @@ for(i in 1:length(focal_sites)) {
           pull(value)
       }
 
-      #updated for param + IC + process uncertainty: wt = b1 + b2 * yesterday's wt + b3 * air temp + W
-      forecasted_temperature <- param_df$beta1[ens] + param_df$beta2[ens] * temp_lag + param_df$beta3[ens] * temp_driv$air_temperature[1] + rnorm(1, mean = 0, sd = sigma)
-
+      #updated for param + IC + process uncertainty: wt = b1 + [b2 * yesterday's wt] + [b3 * air temp] + W
+      forecasted_temperature <- param_df$beta1[ens] + param_df$beta2[ens] * temp_lag + param_df$beta3[ens] * temp_driv$air_temperature[1] + rnorm(1, mean = 0, sd = sigma) #<- ai helped me integrate process uncertainty here 
+      #param uncertainty coming from the coefficients calculated earlier
+      #IC uncertainty is set up before the for loop and integrated in the first time step when I make the dataframe
+      #process uncertainty is the last part of this equation calculated from sigma earlier from the difference between the model and the observed temperatures. 
+      
       # store forecast back into forecast_ic_unc so it can be used as lag for next timestep
       forecast_ic_unc <- forecast_ic_unc %>%
         mutate(value = ifelse(forecast_date == forecasted_dates[t] & ensemble_member == ens,
